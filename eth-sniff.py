@@ -23,6 +23,8 @@ from scapy.all import *
 
 """
 http://www.secdev.org/projects/scapy/doc/usage.html
+
+http://www.tutorialspoint.com/python/python_dictionary.htm
 """
 
 tcp_buffer  = [] #A list that will store the captured unfiltered packets
@@ -59,12 +61,26 @@ IS_HTTP         = 4 #The packet has HTTP layer
 GET_AV          = 5 #If IS_HTTP: GET request has -audio and -video request (????)
 CONTENT-TYPE    = 6 #If IS_HTTP: Content-Type of the packet is: application/vnd.apple.mpegurl
 
+def printout():
+    """
+        DEBUGGING FUNCTION
+        This thread will printout only streams from time to time
+    """
+    while True:
+        time.sleep(20) #sleep
+
+        for k in stream_val.keys():
+            if stream_val(k) == 1:
+                kk = k.split("|")
+                print "src: "+str(k[0])+" dest: "+str(k[1])
+
+        print "------------------"
 
 def stream_decider():
     """
         This thread will decide if a Stream is a stream or not
     """
-            
+          
 
 def manage_pckg(pack):
     """
@@ -96,7 +112,7 @@ def manage_pckg(pack):
                 blacklisted = True;
             
 
-        if !blacklisted:
+        if not blacklisted:
             #TODO: Check if TCP has timestamps enabled
             stream_data[HAS_TS] = False
 
@@ -118,6 +134,8 @@ def manage_pckg(pack):
 
             streams[ip] = stream_data #add the data to the dictionary, if it exists python updates it
             stream_val[ip] = is_stream #Whether the stream IS a stream or it is undecided
-            
-	
+
+#call threads:
+
+#call sniffer:
 sniff(prn=manage_pckg, store=0)
