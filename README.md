@@ -1,1 +1,1 @@
-Master Thesis Project
+Time Streaming Synchronization
