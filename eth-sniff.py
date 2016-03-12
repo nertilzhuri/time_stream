@@ -71,9 +71,9 @@ def printout():
         This thread will printout only streams from time to time
     """
     
-    """
+    
     while True:
-        time.sleep(20) #sleep
+        time.sleep(10) #sleep
 
         for k in stream_val.keys():
             if stream_val[k] == 1:
@@ -81,30 +81,30 @@ def printout():
                 print ""+str(kk[0])+" <---> "+str(kk[1])
 
         print "------------------"
-	"""
 	
-    while True:
-        time.sleep(5)
-
-        s = ""
-        f = open("streams/stream-"+time.strftime("%H:%M:%S"), 'a')
-
-
-        for k in stream_val.keys():
-            kk = k.split("|")
-            val = stream_val[k]
-            
-            s += kk[0]+" <> "+kk[1]+" -- "+str(val)+"\n\n"
-            
-            for i in streams[k]:
-                    s += str(i)+"\n\n"
-            
-            s += "---------------------------\n"
-            
-            
-            f.write(s)
-
-        f.close()
+	
+##    while True:
+##        time.sleep(5)
+##
+##        s = ""
+##        f = open("streams/stream-"+time.strftime("%H:%M:%S"), 'a')
+##
+##
+##        for k in stream_val.keys():
+##            kk = k.split("|")
+##            val = stream_val[k]
+##            
+##            s += kk[0]+" <> "+kk[1]+" -- "+str(val)+"\n\n"
+##            
+##            for i in streams[k]:
+##                    s += str(i)+"\n\n"
+##            
+##            s += "---------------------------\n"
+##            
+##            
+##            f.write(s)
+##
+##        f.close()
 				
 			
 
@@ -120,34 +120,84 @@ def stream_decider():
             |-> HTTP response with content-type: application/vnd.apple.mpegurl
             |-> Has timestamps enabled
     """
+    while True:
+        time.sleep(5) #wait 5 seconds
 
-    stream_amount_threshold = 100 #a stream must have at least THRESHOLD packets to be considered for a stream
-    stream_score_threshold  = 10  #A stream must pass the score threshold to be considered a stream
+        stream_amount_threshold = 100 #a stream must have at least THRESHOLD packets to be considered for a stream
+        stream_score_threshold  = 4  #A stream must pass the score threshold to be considered a stream
+        stream_time_threshold   = 2   #If a stream has too little packets, we check the time to decide if the stream will continue or not
 
-    for k in stream_val.keys():
-        if stream_val[k] == 0: #we will check only for the undecided streams
-            stream = streams[k] #get the stream list for the k ip set
-            
-            if len(stream) < stream_amount_threshold:
-                stream_score = 1 #the score that the stream gets (by product)
 
-                no_timestamps   = True
-                no_get_av       = True
-                no_content_tp   = True
-                no_http         = True
-                no_clock        = True
-
-                amt_timestamps  = 0 #amount of TCP packets that have timestamps enabled decremented by -1 for each packet that does not have timestamps enabled
-                amt_get_av      = 0 #amount of http requests that request audio and video
-                amt_content_tp  = 0 #amount of http responses with specific content type
-                amt_http        = 0 #must be greater than amt_content_tp + amt_get_av 
-                amt_clock       = 0 #must be equal to the amt_content_tp
+        for k in stream_val.keys():
+            if stream_val[k] == 0: #we will check only for the undecided streams
+                stream = streams[k] #get the stream list for the k ip set
                 
-                for s in stream:
-                    #Check the streams one by one
+                if len(stream) >= stream_amount_threshold:
+                    stream_score = 1 #the score that the stream gets (by product)
 
-    
-    return
+                    amt_timestamps  = 0 #amount of TCP packets that have timestamps enabled decremented by -1 for each packet that does not have timestamps enabled
+                    amt_get_av      = 0 #amount of http requests that request audio and video
+                    amt_content_tp  = 0 #amount of http responses with specific content type
+                    amt_http        = 0 #must be greater than amt_content_tp + amt_get_av 
+                    amt_clock       = 0 #must be equal to the amt_content_tp
+
+                    #print "["+str(k)+"]"+" Checking streams "
+                    
+                    for s in stream:
+                        #Check the streams one by one
+
+                        #if a packet without timestamp is found, break
+                        if s[HAS_TS] == False:
+                            #print "["+str(k)+"]"+" No timestamps "
+                            break
+
+                        #count the number of GET_AV
+                        if s[GET_AV]:
+                            amt_get_av += 1
+
+                        #count the number of content tupes
+                        if s[CONTENT_TYPE]:
+                            amt_content_tp += 1
+
+                        #count the number of http packets
+                        if s[IS_HTTP]:
+                            amt_http += 1
+
+                        #count the number of clocks
+                        if len(s[CLOCK]) > 0:
+                            amt_clock += 1
+
+                    if amt_get_av == 0 or amt_get_av == 0 or amt_content_tp == 0 or amt_http == 0 or amt_clock == 0:
+                        stream_score *= -1
+                        #print "["+str(k)+"]"+" Not all options "
+                    else:
+                        stream_score *= 2
+                        if abs(amt_clock - amt_content_tp) < 10: #ideally must be 0
+                            stream_score *= 2
+                        if abs(amt_content_tp - amt_get_av) < 10: #ideally must be 0
+                            stream_score *= 2
+
+                    if stream_score < 0:
+                        stream_val[k] = -1
+                    
+                    #print "Stream: "+str(k)+" score: "+str(stream_score)
+
+                    if stream_score >= stream_score_threshold:
+                        stream_val[k] = 1
+
+                else:
+                    #Stream has too little packets, check the last packet time if the stream is continuing or not
+                    ss = stream[-1] #get the last packet
+                    t0 = ss[TIMESTAMP]
+                    t1 = time.time()
+
+                    #print "["+str(k)+"]"+" Less Packets "
+                    
+                    tt = t1-t0
+
+                    if tt > stream_time_threshold:
+                        stream_val[k] = -1
+                        #print "["+str(k)+"]"+" Low packet count "
     
           
 
@@ -209,16 +259,19 @@ def manage_pckg(pack):
 
                     payload = pack[Raw].load
 
-                    #Extracting time:
-                    s = payload
+                    clock_t = []
 
-                    s = s.replace("\r", "|")
-                    s = s.replace("\n", "|")
-                    s = s.replace(":", "|")
+                    if "Date" in payload:
+                        #Extracting time:
+                        s = payload
 
-                    t = s.split("|")
+                        s = s.replace("\r", "|")
+                        s = s.replace("\n", "|")
+                        s = s.replace(":", "|")
 
-                    clock_t = (str(t[t.index('Date')+1])+" "+str(t[t.index('Date')+2])+" "+str(t[t.index('Date')+3])).strip().rstrip().replace(",", "").split(" ")
+                        t = s.split("|")
+
+                        clock_t = (str(t[t.index('Date')+1])+" "+str(t[t.index('Date')+2])+" "+str(t[t.index('Date')+3])).strip().rstrip().replace(",", "").split(" ")
 
                     
                     stream_data[CLOCK] = clock_t
