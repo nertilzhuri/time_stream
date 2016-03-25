@@ -21,6 +21,7 @@ Updates:
 import time
 import threading
 from scapy.all import *
+import matplotlib.pyplot as plt
 
 """
 http://www.secdev.org/projects/scapy/doc/usage.html
@@ -49,7 +50,7 @@ streams     = {} #Filtered packets into streams
 stream_val  = {} #The values that decide if it is a stream or not
 
 delays      = {} #The delays of each stream that is decided as a stream
-
+clocks      = {} #The clocks of each stream
 """
 These are the constant indexes of the stored stream
 These data fields will be used to determine if the captured packets belong to a stream
@@ -69,17 +70,45 @@ def printout():
         DEBUGGING FUNCTION
         This thread will printout only streams from time to time
     """
-    
-    
+   
     while True:
-        time.sleep(10) #sleep
-
-        for k in stream_val.keys():
-            if stream_val[k] == 1:
-                kk = k.split("|")
-                print ""+str(kk[0])+" <---> "+str(kk[1])
-
-        print "------------------"
+        time.sleep(30)
+        
+        
+        
+        print "Stream Delay"
+        for k in delays.keys():
+            kk = k.split("|")
+            print ""+str(kk[0])+" <---> "+str(kk[1])
+            print str(len(delays[k]))
+            print str(len(streams[k]))
+            #print kl
+            
+            #Plot the delay vs timestamp 
+            plt.plot(streams[k], delays[k], 'r-')
+            plt.show()            
+            
+            print "------------------"
+        
+        
+#        print "Stream: "
+#        for k in stream_val.keys():
+#            if stream_val[k] == 1:
+#                kk = k.split("|")
+#                print ""+str(kk[0])+" <---> "+str(kk[1])
+#            
+#            print "------------------"
+    
+    
+#    while True:
+#        time.sleep(10) #sleep
+#
+#        for k in stream_val.keys():
+#            if stream_val[k] == 1:
+#                kk = k.split("|")
+#                print ""+str(kk[0])+" <---> "+str(kk[1])
+#
+#        print "------------------"
 	
 	
 ##    while True:
@@ -120,12 +149,14 @@ def stream_decider():
             |-> Has timestamps enabled
     """
     while True:
+        #print "here"
         time.sleep(5) #wait 5 seconds
 
         stream_amount_threshold = 100 #a stream must have at least THRESHOLD packets to be considered for a stream
         stream_score_threshold  = 4  #A stream must pass the score threshold to be considered a stream
         stream_time_threshold   = 2   #If a stream has too little packets, we check the time to decide if the stream will continue or not
 
+        #print str(len(stream_val))
 
         for k in stream_val.keys():
             if stream_val[k] == 0: #we will check only for the undecided streams
@@ -185,7 +216,8 @@ def stream_decider():
                     if stream_score >= stream_score_threshold:
                         stream_val[k] = 1
                         streams[k] = [] #reset the list
-                        delays[k] = [] #create a list
+                        delays[k] = [0] #create a list
+                        clocks[k] = [] #create a list of clocks
 
                 else:
                     #Stream has too little packets, check the last packet time if the stream is continuing or not
@@ -254,11 +286,12 @@ def manage_pckg(pack):
 
         if not blacklisted:
 
-            if is_stream:
+            if is_stream == 1:
                 #No need to record other data, just the timestamp and the clock are enough
-                stream_data = [stream_data[TIMESTAMP], []]
+                #stream_data = [stream_data[TIMESTAMP], []]
                 
-
+                clock_t = []
+                
                 if pack.haslayer(Raw) and "Date" in pack[Raw].load:
                     payload = pack[Raw].load
 
@@ -271,13 +304,13 @@ def manage_pckg(pack):
 
                     clock_t = (str(t[t.index('Date')+1])+" "+str(t[t.index('Date')+2])+" "+str(t[t.index('Date')+3])).strip().rstrip().replace(",", "").split(" ")
 
-                    stream_data[1] = clock_t
+                    #stream_data[1] = clock_t
 
                 ll = streams[ip]
 
                 if len(ll) > 0:
                     #get the last timestamp
-                    last_ts = ll[-1][0]
+                    last_ts = ll[-1]
 
                     #Calculate the delay
                     delay = stream_data[TIMESTAMP] - last_ts
@@ -287,12 +320,14 @@ def manage_pckg(pack):
                     dl.append(delay)
                     delays[ip] = dl
                     
-                ll.append(stream_data)
+                ll.append(stream_data[TIMESTAMP])
 
                 streams[ip] = ll
 
-                
-                
+                cc = clocks[ip]
+                cc.append(clock_t)
+                clocks[ip] = cc
+
                     
             else:
             
@@ -302,7 +337,7 @@ def manage_pckg(pack):
                     if "HTTP" in pack[Raw].load:
                         stream_data[IS_HTTP] = True
 
-                        
+                        payload = pack[Raw].load
 
                         clock_t = []
 
