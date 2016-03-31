@@ -17,9 +17,10 @@ Streams are decided according to the:
             |-> Has timestamps enabled
 
 Packet streams are categorized in groups:
-	-1: Blacklisted: the ip addresses are not part of a stream (live stream)
-	 0: Undecided: there is too little packet exchange to decide if it is a stream or not
-	 1: Stream: the ip addressess are part of a stream (live stream)
+
+		-1: Blacklisted: the ip addresses are not part of a stream (live stream)
+	 	0: Undecided: there is too little packet exchange to decide if it is a stream or not
+	 	1: Stream: the ip addressess are part of a stream (live stream)
 
 If a stream is decided (-1 or 1) the streaming data are erased; 
 If the stream is blacklisted then reseting the data frees memory,
@@ -39,7 +40,14 @@ For each new packet, we get the timestamp and we calculate the delay with the la
 The delays are stored on a special list inside of a delays dictionary with keys same as stream
 This way we have the delays of more than one streams
 	
-	
+[*] Part 2.2 (eth-sniff-plot.py, Done)
+
+The script eth-sniff-plot.py collects and decides the streams for 30 seconds, then starts plotting in real time.
+The generated graphs are 2:
+
+		1st Graph: The timestamp vs delay graph where the big_delays are seen clearly
+		2nd Graph: The timestamp vs big_delay and average of big_delay of the packets; since network connection affects the delays, the average will be considered for the experiments
+
 [*] Part 3 (planned):
 
 Do Part 2 for multiple streams and find possible clock ranges (a thread for each stream?)
